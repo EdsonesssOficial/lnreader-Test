@@ -22,6 +22,26 @@ jest.mock('react-native-device-info', () => ({
   useBatteryLevel: jest.fn(() => 1),
 }));
 
+jest.mock('@modules/native-background-music', () => ({
+  __esModule: true,
+  default: {
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    pickAudioFiles: jest.fn().mockResolvedValue([]),
+    listTracks: jest.fn().mockResolvedValue([]),
+    setQueue: jest.fn(),
+    play: jest.fn(),
+    pause: jest.fn(),
+    stop: jest.fn(),
+    next: jest.fn(),
+    previous: jest.fn(),
+    setVolume: jest.fn(),
+    setPitch: jest.fn(),
+    setRepeat: jest.fn(),
+    setShuffle: jest.fn(),
+    release: jest.fn(),
+  },
+}));
+
 jest.mock('@modules/native-file', () => ({
   __esModule: true,
   default: {

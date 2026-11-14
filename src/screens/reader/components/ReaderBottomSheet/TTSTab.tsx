@@ -12,6 +12,7 @@ import {
 import { getString } from '@i18n/translations';
 import { Chip } from 'react-native-paper';
 import ReaderSheetPreferenceItem from './ReaderSheetPreferenceItem';
+import BackgroundMusicSection from './BackgroundMusicSection';
 
 interface VoicePickerModalProps {
   visible: boolean;
@@ -436,6 +437,8 @@ const TTSTab: React.FC = () => {
                 }
                 theme={theme}
               />
+
+              <BackgroundMusicSection />
             </>
           ) : null}
         </View>

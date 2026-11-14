@@ -27,6 +27,7 @@ import { PLUGIN_STORAGE } from '@utils/Storages';
 import { useChapterContext } from '../ChapterContext';
 import { ReaderSearchResult } from '../types';
 import { useTtsSession } from '../hooks/useTtsSession';
+import { useTtsBackgroundMusic } from '../hooks/useTtsBackgroundMusic';
 import type { TtsSettings } from '@modules/nitro-tts';
 import { ChapterInfo } from '@database/types';
 import { Dialog } from '@components/Dialog';
@@ -200,6 +201,8 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
   );
 
   const readerSettingsRef = useRef<ChapterReaderSettings>(readerSettings);
+
+  useTtsBackgroundMusic(ttsState, readerSettings.tts?.backgroundMusic);
 
   useEffect(() => {
     readerSettingsRef.current = readerSettings;

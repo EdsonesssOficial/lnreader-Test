@@ -5,6 +5,11 @@ import {
   LibrarySortOrder,
 } from '@screens/library/constants/constants';
 import { TtsEngine, TtsVoice } from '@modules/nitro-tts';
+import {
+  BackgroundMusicSettings,
+  defaultBackgroundMusicSettings,
+  normalizeBackgroundMusicSettings,
+} from '@services/backgroundMusic/types';
 import { useMMKVObject } from 'react-native-mmkv';
 import { useEffect, useMemo } from 'react';
 import { getMMKVObject } from '@utils/mmkv/mmkv';
@@ -222,6 +227,8 @@ export interface ChapterReaderSettings {
     pitch?: number;
     autoPageAdvance?: boolean;
     scrollToTop?: boolean;
+    /** Music that plays underneath the voice while TTS is reading. */
+    backgroundMusic?: BackgroundMusicSettings;
   };
   epubLocation: string;
   epubUseAppTheme: boolean;
@@ -341,6 +348,7 @@ export const initialChapterReaderSettings: ChapterReaderSettings = {
     pitch: 1,
     autoPageAdvance: false,
     scrollToTop: true,
+    backgroundMusic: defaultBackgroundMusicSettings,
   },
   epubLocation: '',
   epubUseAppTheme: false,
@@ -440,6 +448,9 @@ export const useChapterReaderSettings = () => {
         scrollToTop: storedSettings.tts?.scrollToTop ?? true,
         rate: storedSettings.tts?.rate ?? 1,
         pitch: storedSettings.tts?.pitch ?? 1,
+        backgroundMusic: normalizeBackgroundMusicSettings(
+          storedSettings.tts?.backgroundMusic,
+        ),
       },
     }),
     [storedSettings],
