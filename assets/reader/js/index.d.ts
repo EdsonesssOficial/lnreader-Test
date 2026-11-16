@@ -31,6 +31,14 @@ export interface Reader {
     noNextChapter: string;
     removeText: string;
     replaceText: string;
+    scriptCharacter: string;
+    scriptAmbient: string;
+    narratorLabel: string;
+    noAmbientLabel: string;
+    noCharacters: string;
+    noAmbients: string;
+    clearMarks: string;
+    confirmClearMarks: string;
   };
 
   setAdjacentChapters: (adjacent: {

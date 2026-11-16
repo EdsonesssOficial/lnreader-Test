@@ -15,6 +15,8 @@ import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 
 internal object TtsPlaybackStore {
+    private const val CHARACTER_FIELD_SEPARATOR = '\u001f'
+
     private val ownerHandler = Handler(Looper.getMainLooper())
     private val stateListeners = TtsListenerRegistry<TtsPlaybackState>()
     private val progressListeners = TtsListenerRegistry<TtsProgress>()
@@ -367,9 +369,11 @@ internal object TtsPlaybackStore {
         generation += 1
         val utteranceId = utteranceId(generation, currentIndex)
 
-        activeEngine.setSpeechRate(settings.rate.toFloat().coerceIn(0.1f, 4.0f))
-        activeEngine.setPitch(settings.pitch.toFloat().coerceIn(0.1f, 2.0f))
-        applyVoice(activeEngine)
+        // A paragraph assigned to a character carries its own voice settings.
+        val character = parseCharacterVoice(paragraph.id)
+        activeEngine.setSpeechRate((character?.rate ?: settings.rate).toFloat().coerceIn(0.1f, 4.0f))
+        activeEngine.setPitch((character?.pitch ?: settings.pitch).toFloat().coerceIn(0.1f, 2.0f))
+        applyVoice(activeEngine, character?.voiceIdentifier)
 
         val result = activeEngine.speak(
             paragraph.text,
@@ -388,7 +392,34 @@ internal object TtsPlaybackStore {
         emitState()
     }
 
-    private fun applyVoice(activeEngine: TextToSpeech) {
+    /** Voice, rate and pitch encoded in a paragraph id by the reader. */
+    private class CharacterVoice(
+        val voiceIdentifier: String?,
+        val rate: Double,
+        val pitch: Double,
+    )
+
+    /**
+     * Ids are `index`, or `index<US>voice<US>rate<US>pitch` for text assigned to a
+     * character (US = U+001F). Anything else is treated as a plain paragraph.
+     */
+    private fun parseCharacterVoice(paragraphId: String): CharacterVoice? {
+        val parts = paragraphId.split(CHARACTER_FIELD_SEPARATOR)
+        if (parts.size < 4) return null
+        val rate = parts[2].toDoubleOrNull() ?: return null
+        val pitch = parts[3].toDoubleOrNull() ?: return null
+        return CharacterVoice(parts[1].ifBlank { null }, rate, pitch)
+    }
+
+    private fun applyVoice(activeEngine: TextToSpeech, characterVoice: String? = null) {
+        if (!characterVoice.isNullOrBlank()) {
+            val voice = activeEngine.voices?.firstOrNull { it.name == characterVoice }
+            if (voice != null) {
+                activeEngine.voice = voice
+                return
+            }
+            // Unknown to this engine: fall through to the narrator voice.
+        }
         val voiceIdentifier = settings.voiceIdentifier
         if (voiceIdentifier.isNullOrBlank()) {
             activeEngine.setLanguage(Locale.getDefault())

@@ -4,6 +4,7 @@ import type { TtsPlaybackState } from '@modules/nitro-tts';
 import { backgroundMusicController } from '@services/backgroundMusic/backgroundMusicController';
 import {
   BackgroundMusicSettings,
+  getEqualizerSignature,
   getSourcesSignature,
   normalizeBackgroundMusicSettings,
 } from '@services/backgroundMusic/types';
@@ -20,8 +21,10 @@ export const useTtsBackgroundMusic = (
   stored?: Partial<BackgroundMusicSettings>,
 ) => {
   const settings = normalizeBackgroundMusicSettings(stored);
-  const { enabled, volume, pitch, repeat, shuffle } = settings;
+  const { enabled, volume, pitch, speed, repeat, shuffle, bassBoost } =
+    settings;
   const sourcesSignature = getSourcesSignature(settings.sources);
+  const equalizerSignature = getEqualizerSignature(settings.equalizer);
 
   const settingsRef = useRef(settings);
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,7 +37,16 @@ export const useTtsBackgroundMusic = (
     if (enabled) {
       backgroundMusicController.applySettings(settingsRef.current);
     }
-  }, [enabled, volume, pitch, repeat, shuffle]);
+  }, [
+    enabled,
+    volume,
+    pitch,
+    speed,
+    repeat,
+    shuffle,
+    bassBoost,
+    equalizerSignature,
+  ]);
 
   useEffect(() => {
     if (pauseTimerRef.current) {

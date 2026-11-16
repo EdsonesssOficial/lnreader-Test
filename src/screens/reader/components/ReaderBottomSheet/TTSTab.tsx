@@ -22,7 +22,7 @@ interface VoicePickerModalProps {
   currentVoice?: TtsVoice;
 }
 
-const VoicePickerModal: React.FC<VoicePickerModalProps> = ({
+export const VoicePickerModal: React.FC<VoicePickerModalProps> = ({
   visible,
   onDismiss,
   voices,

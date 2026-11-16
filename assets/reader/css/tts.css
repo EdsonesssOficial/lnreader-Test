@@ -82,3 +82,101 @@
   padding-right: 6px;
   text-align: center;
 }
+
+/* Script characters: tinted passages and the character picker */
+span.tts-char {
+  border-radius: 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+#tts-character-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
+#tts-character-picker .tts-char-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 60%;
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 24px 24px 0 0;
+  background-color: var(--theme-surface);
+  color: var(--theme-onSurface);
+}
+
+#tts-character-picker .tts-char-title {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--theme-onSurfaceVariant);
+}
+
+#tts-character-picker .tts-char-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#tts-character-picker .tts-char-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--theme-outlineVariant);
+  border-radius: 22px;
+  background: transparent;
+  color: var(--theme-onSurface);
+  font-size: 14px;
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+#tts-character-picker .tts-char-option:active {
+  background-color: var(--theme-surfaceVariant);
+}
+
+#tts-character-picker .tts-char-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+#tts-character-picker .tts-char-dot-narrator {
+  border: 2px solid var(--theme-onSurfaceVariant);
+  box-sizing: border-box;
+}
+
+/* Passage being read (only the assigned passage, not the whole paragraph) */
+::highlight(tts-active) {
+  color: var(--readerSettings-textColor);
+  background-color: color-mix(
+    in srgb,
+    var(--readerSettings-textColor) 20%,
+    transparent
+  );
+}
+
+#tts-character-picker .tts-char-dot-empty {
+  border: 2px solid var(--theme-onSurfaceVariant);
+  box-sizing: border-box;
+}
+
+#tts-character-picker .tts-char-clear {
+  display: block;
+  margin-top: 16px;
+  min-height: 40px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--theme-onSurfaceVariant);
+  font-size: 13px;
+  text-decoration: underline;
+}

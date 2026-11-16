@@ -16,6 +16,7 @@ import {
   normalizeBackgroundMusicSettings,
 } from '@services/backgroundMusic/types';
 import ReaderSheetPreferenceItem from './ReaderSheetPreferenceItem';
+import MusicEqualizerSection from './MusicEqualizerSection';
 
 const REPEAT_ORDER: MusicRepeatMode[] = ['off', 'all', 'one'];
 const REPEAT_LABELS: Record<MusicRepeatMode, string> = {
@@ -199,6 +200,22 @@ const BackgroundMusicSection: React.FC = () => {
             />
           </View>
 
+          <View style={styles.sliderSection}>
+            <Text style={[styles.sliderLabel, { color: theme.onSurface }]}>
+              Music speed: {music.speed.toFixed(2)}x
+            </Text>
+            <Slider
+              value={music.speed}
+              min={0.5}
+              max={2}
+              step={0.05}
+              showValueIndicator
+              formatValue={value => `${value.toFixed(2)}x`}
+              accessibilityLabel="Background music speed"
+              onSlidingComplete={value => update({ speed: value })}
+            />
+          </View>
+
           <List.Item
             title="Repeat"
             description={REPEAT_LABELS[music.repeat]}
@@ -212,6 +229,8 @@ const BackgroundMusicSection: React.FC = () => {
             onPress={() => update({ shuffle: !music.shuffle })}
             theme={theme}
           />
+
+          <MusicEqualizerSection music={music} update={update} />
 
           <View style={styles.playerRow}>
             <View style={styles.playerInfo}>

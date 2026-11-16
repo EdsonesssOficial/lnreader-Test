@@ -2,8 +2,11 @@ package expo.modules.nativebackgroundmusic
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.PlaybackParams
+import android.media.audiofx.BassBoost
+import android.media.audiofx.Equalizer
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -34,8 +37,19 @@ internal class BackgroundMusicPlayer(
     private var repeat = REPEAT_ALL
     private var volume = 0.5f
     private var pitch = 1f
+    private var speed = 1f
     private var wantsPlaying = false
     private var failedInRow = 0
+
+    /**
+     * One audio session shared by every track, so the effects below are created
+     * once and keep working across track changes instead of being rebuilt.
+     */
+    private val effectsSession: Int =
+        (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
+            ?.generateAudioSessionId() ?: AudioManager.ERROR
+    private var equalizer: Equalizer? = null
+    private var bassBoost: BassBoost? = null
 
     fun setQueue(uris: List<String>, startIndex: Int, shuffleEnabled: Boolean) {
         handler.post {
@@ -109,7 +123,17 @@ internal class BackgroundMusicPlayer(
             pitch = value.coerceIn(MIN_PITCH, MAX_PITCH)
             val player = mediaPlayer
             if (player != null && prepared && player.isPlaying) {
-                applyPitch(player)
+                applyPlaybackParams(player)
+            }
+        }
+    }
+
+    fun setSpeed(value: Float) {
+        handler.post {
+            speed = value.coerceIn(MIN_SPEED, MAX_SPEED)
+            val player = mediaPlayer
+            if (player != null && prepared && player.isPlaying) {
+                applyPlaybackParams(player)
             }
         }
     }
@@ -141,7 +165,115 @@ internal class BackgroundMusicPlayer(
             queue = emptyList()
             order = emptyList()
             cursor = 0
+            releaseEffects()
         }
+    }
+
+    /** Band layout of the device equalizer, or null when it is unsupported. */
+    @Synchronized
+    fun getEqualizerInfo(): Map<String, Any?>? {
+        val eq = ensureEqualizer() ?: return null
+        return try {
+            val range = eq.bandLevelRange
+            val bandCount = eq.numberOfBands.toInt()
+            mapOf(
+                "minLevel" to range[0].toInt(),
+                "maxLevel" to range[1].toInt(),
+                "bands" to (0 until bandCount).map { band ->
+                    mapOf("centerFrequency" to eq.getCenterFreq(band.toShort()) / 1000)
+                },
+                "presets" to (0 until eq.numberOfPresets.toInt()).map { preset ->
+                    eq.getPresetName(preset.toShort())
+                },
+                "bassBoostSupported" to isBassBoostSupported(),
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Applies the levels (millibels, one per band) and switches the equalizer on or off. */
+    @Synchronized
+    fun setEqualizer(enabled: Boolean, levels: List<Int>) {
+        val eq = (if (enabled) ensureEqualizer() else equalizer) ?: return
+        try {
+            if (enabled) {
+                val range = eq.bandLevelRange
+                val bandCount = minOf(eq.numberOfBands.toInt(), levels.size)
+                for (band in 0 until bandCount) {
+                    val level = levels[band].coerceIn(range[0].toInt(), range[1].toInt())
+                    eq.setBandLevel(band.toShort(), level.toShort())
+                }
+            }
+            eq.setEnabled(enabled)
+        } catch (_: Exception) {
+            // The effect may have been reclaimed by the system; it is rebuilt on demand.
+            equalizer = null
+        }
+    }
+
+    @Synchronized
+    fun getPresetLevels(index: Int): List<Int> {
+        val eq = ensureEqualizer() ?: return emptyList()
+        return try {
+            eq.usePreset(index.toShort())
+            (0 until eq.numberOfBands.toInt()).map { band ->
+                eq.getBandLevel(band.toShort()).toInt()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /** [strength] is 0..1000; 0 turns the effect off. */
+    @Synchronized
+    fun setBassBoost(strength: Int) {
+        if (effectsSession <= 0) return
+        try {
+            if (strength <= 0) {
+                bassBoost?.setEnabled(false)
+            } else {
+                val effect = bassBoost ?: BassBoost(0, effectsSession).also { bassBoost = it }
+                if (effect.strengthSupported) {
+                    effect.setStrength(strength.coerceIn(0, 1000).toShort())
+                    effect.setEnabled(true)
+                }
+            }
+        } catch (_: Exception) {
+            bassBoost = null
+        }
+    }
+
+    private fun isBassBoostSupported(): Boolean {
+        if (effectsSession <= 0) return false
+        return try {
+            val effect = bassBoost ?: BassBoost(0, effectsSession).also { bassBoost = it }
+            effect.strengthSupported
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun ensureEqualizer(): Equalizer? {
+        if (effectsSession <= 0) return null
+        equalizer?.let { return it }
+        return try {
+            Equalizer(0, effectsSession).also { equalizer = it }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    @Synchronized
+    private fun releaseEffects() {
+        try {
+            equalizer?.release()
+            bassBoost?.release()
+        } catch (_: Exception) {
+            // Nothing left to clean up.
+        }
+        equalizer = null
+        bassBoost = null
     }
 
     private fun currentQueueIndex(): Int = order.getOrNull(cursor) ?: 0
@@ -202,6 +334,7 @@ internal class BackgroundMusicPlayer(
         mediaPlayer = player
         prepared = false
         try {
+            attachEffectsSession(player)
             player.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -235,6 +368,16 @@ internal class BackgroundMusicPlayer(
         }
     }
 
+    /** Must run while the player is idle, before the data source is set. */
+    private fun attachEffectsSession(player: MediaPlayer) {
+        if (effectsSession <= 0) return
+        try {
+            player.audioSessionId = effectsSession
+        } catch (_: Exception) {
+            // Effects will not apply, but the music still plays.
+        }
+    }
+
     private fun handleTrackError(message: String) {
         failedInRow += 1
         if (failedInRow >= queue.size.coerceAtLeast(1)) {
@@ -249,17 +392,17 @@ internal class BackgroundMusicPlayer(
     private fun startPlayback(player: MediaPlayer) {
         try {
             if (!player.isPlaying) player.start()
-            if (pitch != 1f) applyPitch(player)
+            if (pitch != 1f || speed != 1f) applyPlaybackParams(player)
         } catch (_: IllegalStateException) {
             // Player was released while the request was queued.
         }
     }
 
-    private fun applyPitch(player: MediaPlayer) {
+    private fun applyPlaybackParams(player: MediaPlayer) {
         try {
-            player.playbackParams = PlaybackParams().setSpeed(1f).setPitch(pitch)
+            player.playbackParams = PlaybackParams().setSpeed(speed).setPitch(pitch)
         } catch (_: Exception) {
-            // Some devices reject pitch changes; keep the original pitch.
+            // Some devices reject speed/pitch changes; keep the original sound.
         }
     }
 
@@ -285,5 +428,7 @@ internal class BackgroundMusicPlayer(
         const val REPEAT_ONE = "one"
         private const val MIN_PITCH = 0.5f
         private const val MAX_PITCH = 2f
+        private const val MIN_SPEED = 0.5f
+        private const val MAX_SPEED = 2f
     }
 }

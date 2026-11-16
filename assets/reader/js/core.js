@@ -189,6 +189,9 @@ window.tts = new (function () {
   this.totalElements = 0;
   this.allReadableElements = []; // Store all readable elements at start
   this.textQueue = []; // Flat list of normalized text for native fallback
+  this.characterQueue = []; // Character id (or null = narrator) per queue item
+  this.ambientQueue = []; // Ambient sound id (or null) per queue item
+  this.segmentRanges = []; // {start, end} offsets inside the element, or null
 
   this.readable = element => {
     const ele = element ?? this.currentElement;
@@ -309,15 +312,44 @@ window.tts = new (function () {
   this.start = element => {
     const startElement = element ?? reader.chapterElement;
 
-    const readableEntries = this.getAllReadableElements(reader.chapterElement)
-      .map(readableElement => ({
-        element: readableElement,
-        text: this.normalizeText(readableElement.innerText),
-      }))
-      .filter(entry => !!entry.text);
+    const readableEntries = [];
+    this.getAllReadableElements(reader.chapterElement).forEach(
+      readableElement => {
+        // Text assigned to characters is split into passages, one per voice.
+        const segments = window.ttsCharacters?.segmentsFor(readableElement);
+        if (segments) {
+          segments.forEach(segment => {
+            const text = this.normalizeText(segment.text);
+            if (text) {
+              readableEntries.push({
+                element: readableElement,
+                text,
+                character: segment.char,
+                ambient: segment.amb,
+                range: { start: segment.start, end: segment.end },
+              });
+            }
+          });
+          return;
+        }
+        const text = this.normalizeText(readableElement.innerText);
+        if (text) {
+          readableEntries.push({
+            element: readableElement,
+            text,
+            character: null,
+            ambient: null,
+            range: null,
+          });
+        }
+      },
+    );
     this.allReadableElements = readableEntries.map(entry => entry.element);
     this.totalElements = this.allReadableElements.length;
     this.textQueue = readableEntries.map(entry => entry.text);
+    this.characterQueue = readableEntries.map(entry => entry.character);
+    this.ambientQueue = readableEntries.map(entry => entry.ambient);
+    this.segmentRanges = readableEntries.map(entry => entry.range);
 
     const requestedIndex =
       element && element !== reader.chapterElement
@@ -332,6 +364,8 @@ window.tts = new (function () {
       type: 'tts-queue',
       data: {
         queue: this.textQueue,
+        characters: this.characterQueue,
+        ambients: this.ambientQueue,
         startIndex,
       },
     });
@@ -387,6 +421,7 @@ window.tts = new (function () {
 
   this.reset = () => {
     this.currentElement?.classList?.remove('highlight');
+    this.clearSegmentHighlight();
     this.prevElement = null;
     this.currentElement = reader.chapterElement;
     this.started = false;
@@ -395,6 +430,9 @@ window.tts = new (function () {
     this.totalElements = 0;
     this.allReadableElements = [];
     this.textQueue = [];
+    this.characterQueue = [];
+    this.ambientQueue = [];
+    this.segmentRanges = [];
     const playPauseButton = document.getElementById('TTS-PlayPause');
     if (playPauseButton) playPauseButton.innerHTML = resumeIcon;
     const progress = document.getElementById('TTS-Progress');
@@ -405,15 +443,56 @@ window.tts = new (function () {
     if (!this.allReadableElements.length) return;
     const targetIndex = Math.max(0, Math.min(index, this.totalElements - 1));
     this.currentElement?.classList?.remove('highlight');
+    this.clearSegmentHighlight();
     this.currentElement = this.allReadableElements[targetIndex];
     this.elementsRead = targetIndex + 1;
     this.started = true;
     this.scrollToElement(this.currentElement);
-    this.currentElement.classList.add('highlight');
+    // A paragraph split into passages highlights only the passage being read.
+    if (
+      !this.highlightSegment(
+        this.currentElement,
+        this.segmentRanges[targetIndex],
+      )
+    ) {
+      this.currentElement.classList.add('highlight');
+    }
     const progress = document.getElementById('TTS-Progress');
     if (progress) {
       progress.textContent = `${targetIndex + 1}/${this.totalElements}`;
     }
+  };
+
+  // Highlights a range of an element's text with the CSS Custom Highlight API.
+  // Returns false when there is no range or the WebView lacks the API, so the
+  // caller can highlight the whole element instead.
+  this.highlightSegment = (element, range) => {
+    if (!range || range.end <= range.start) return false;
+    if (!(window.CSS && CSS.highlights && window.Highlight)) return false;
+
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    const domRange = document.createRange();
+    let position = 0;
+    let started = false;
+    let node;
+    while ((node = walker.nextNode())) {
+      const length = node.nodeValue.length;
+      if (!started && range.start < position + length) {
+        domRange.setStart(node, Math.max(0, range.start - position));
+        started = true;
+      }
+      if (started && range.end <= position + length) {
+        domRange.setEnd(node, range.end - position);
+        CSS.highlights.set('tts-active', new Highlight(domRange));
+        return true;
+      }
+      position += length;
+    }
+    return false;
+  };
+
+  this.clearSegmentHighlight = () => {
+    if (window.CSS && CSS.highlights) CSS.highlights.delete('tts-active');
   };
 
   this.setPlaybackState = state => {
@@ -1020,6 +1099,9 @@ window.addEventListener('load', () => {
     appliedHTML = html;
     reader.refresh();
     schedulePageCalculation();
+
+    // The new markup has no character highlights yet.
+    window.ttsCharacters?.reapply();
 
     // Replacing the markup dropped the highlights, so restore the search.
     const searchQuery = window.readerSearch?.query;

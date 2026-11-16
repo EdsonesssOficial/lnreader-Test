@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { TtsCharacter, encodeParagraphId } from '@services/ttsCharacters/types';
 import {
   Tts,
   TtsMetadata,
@@ -71,6 +72,7 @@ export const useTtsSession = () => {
       startIndex: number,
       metadata: TtsMetadata,
       settings: TtsSettings,
+      characters?: (TtsCharacter | undefined)[],
     ) => {
       if (queue.length === 0) {
         setError('No readable paragraphs were found in this chapter.');
@@ -78,7 +80,10 @@ export const useTtsSession = () => {
       }
       await run(async session => {
         await session.load(
-          queue.map((text, index) => ({ id: String(index), text })),
+          queue.map((text, index) => ({
+            id: encodeParagraphId(index, characters?.[index]),
+            text,
+          })),
           startIndex,
           metadata,
           settings,

@@ -28,6 +28,12 @@ import { useChapterContext } from '../ChapterContext';
 import { ReaderSearchResult } from '../types';
 import { useTtsSession } from '../hooks/useTtsSession';
 import { useTtsBackgroundMusic } from '../hooks/useTtsBackgroundMusic';
+import { useTtsAmbient } from '../hooks/useTtsAmbient';
+import {
+  getChapterMarks,
+  saveChapterMarks,
+} from '@services/ttsCharacters/marks';
+import type { TtsCharacter } from '@services/ttsCharacters/types';
 import type { TtsSettings } from '@modules/nitro-tts';
 import { ChapterInfo } from '@database/types';
 import { Dialog } from '@components/Dialog';
@@ -201,8 +207,16 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
   );
 
   const readerSettingsRef = useRef<ChapterReaderSettings>(readerSettings);
+  // Ambient sound id (or null) of each item of the TTS queue being read.
+  const ambientQueueRef = useRef<(string | null)[]>([]);
 
   useTtsBackgroundMusic(ttsState, readerSettings.tts?.backgroundMusic);
+  useTtsAmbient(
+    ttsState,
+    ttsProgress.index,
+    ambientQueueRef,
+    readerSettings.tts?.ambients,
+  );
 
   useEffect(() => {
     readerSettingsRef.current = readerSettings;
@@ -404,6 +418,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                   novel,
                   chapter,
                   batteryLevel,
+                  ttsMarks: getChapterMarks(chapter.id),
                   autoSaveInterval: 2222,
                   DEBUG: __DEV__,
                   strings: {
@@ -414,6 +429,16 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                     noNextChapter: getString('readerScreen.noNextChapter'),
                     removeText: getString('common.remove'),
                     replaceText: getString('customCodeSettings.replace'),
+                    scriptCharacter: 'Script character',
+                    scriptAmbient: 'Ambient sound',
+                    narratorLabel: 'Narrator',
+                    noAmbientLabel: 'No ambient sound',
+                    noCharacters:
+                      'Create characters in TTS settings > Characters',
+                    noAmbients:
+                      'Create ambient sounds in TTS settings > Ambient',
+                    clearMarks: 'Clear all marks in this chapter',
+                    confirmClearMarks: 'Tap again to confirm',
                   },
                 })}
               </script>
@@ -425,6 +450,7 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
               <script src="${assetsUriPrefix}/js/search.js"></script>
               <script src="${assetsUriPrefix}/js/index.js"></script>
               <script src="${assetsUriPrefix}/js/textRemover.js"></script>
+              <script src="${assetsUriPrefix}/js/ttsCharacters.js"></script>
               <script src="${pluginCustomJS}"></script>
               <script id="ln-custom-js">
               function fn(){
@@ -516,14 +542,43 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
           switch (event.type) {
             case 'tts-queue': {
               const payload = event.data as
-                | { queue?: unknown; startIndex?: unknown }
+                | {
+                    queue?: unknown;
+                    characters?: unknown;
+                    ambients?: unknown;
+                    startIndex?: unknown;
+                  }
                 | undefined;
-              const queue = Array.isArray(payload?.queue)
-                ? payload?.queue.filter(
-                    (item): item is string =>
-                      typeof item === 'string' && item.trim().length > 0,
-                  )
+              const rawQueue = Array.isArray(payload?.queue)
+                ? payload?.queue
                 : [];
+              const rawCharacters = Array.isArray(payload?.characters)
+                ? payload?.characters
+                : [];
+              const rawAmbients = Array.isArray(payload?.ambients)
+                ? payload?.ambients
+                : [];
+              const roster = readerSettingsRef.current.tts?.characters ?? [];
+              // Keep each text aligned with the character that reads it.
+              const queue: string[] = [];
+              const characters: (TtsCharacter | undefined)[] = [];
+              const ambientIds: (string | null)[] = [];
+              rawQueue.forEach((item: unknown, index: number) => {
+                if (typeof item === 'string' && item.trim().length > 0) {
+                  queue.push(item);
+                  characters.push(
+                    roster.find(
+                      character => character.id === rawCharacters[index],
+                    ),
+                  );
+                  ambientIds.push(
+                    typeof rawAmbients[index] === 'string'
+                      ? rawAmbients[index]
+                      : null,
+                  );
+                }
+              });
+              ambientQueueRef.current = ambientIds;
               const startIndex =
                 typeof payload?.startIndex === 'number'
                   ? payload.startIndex
@@ -537,7 +592,13 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                   coverUri: novel?.cover || undefined,
                 },
                 toNativeTtsSettings(readerSettingsRef.current.tts),
+                characters,
               );
+              break;
+            }
+            case 'tts-marks': {
+              const data = event.data as { marks?: unknown } | undefined;
+              saveChapterMarks(chapter.id, data?.marks);
               break;
             }
             case 'tts-command': {

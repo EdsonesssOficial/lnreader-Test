@@ -29,6 +29,16 @@ class NativeBackgroundMusicModule : Module() {
     }
     private val player: BackgroundMusicPlayer by playerDelegate
 
+    private val ambientDelegate = lazy {
+        AmbientPlayer(
+            context = requireNotNull(appContext.reactContext).applicationContext,
+            onError = { message ->
+                sendEvent("onAmbientError", mapOf("message" to message))
+            },
+        )
+    }
+    private val ambient: AmbientPlayer by ambientDelegate
+
     private val activityEventListener = object : BaseActivityEventListener() {
         override fun onActivityResult(
             activity: Activity,
@@ -136,7 +146,7 @@ class NativeBackgroundMusicModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("NativeBackgroundMusic")
 
-        Events("onTrackChanged", "onEnded", "onError")
+        Events("onTrackChanged", "onEnded", "onError", "onAmbientError")
 
         OnCreate {
             reactContext?.addActivityEventListener(activityEventListener)
@@ -147,6 +157,7 @@ class NativeBackgroundMusicModule : Module() {
             pendingPick?.reject("ECANCELLED", "Native background music module invalidated", null)
             pendingPick = null
             if (playerDelegate.isInitialized()) player.release()
+            if (ambientDelegate.isInitialized()) ambient.release()
         }
 
         AsyncFunction("pickAudioFiles") { promise: Promise ->
@@ -184,11 +195,26 @@ class NativeBackgroundMusicModule : Module() {
         Function("previous") { player.previous() }
         Function("setVolume") { volume: Double -> player.setVolume(volume.toFloat()) }
         Function("setPitch") { pitch: Double -> player.setPitch(pitch.toFloat()) }
+        Function("setSpeed") { speed: Double -> player.setSpeed(speed.toFloat()) }
         Function("setRepeat") { mode: String -> player.setRepeat(mode) }
         Function("setShuffle") { enabled: Boolean -> player.setShuffle(enabled) }
+        Function("getEqualizerInfo") { player.getEqualizerInfo() }
+        Function("setEqualizer") { enabled: Boolean, levels: List<Int> ->
+            player.setEqualizer(enabled, levels)
+        }
+        Function("getPresetLevels") { index: Int -> player.getPresetLevels(index) }
+        Function("setBassBoost") { strength: Int -> player.setBassBoost(strength) }
         Function("release") {
             if (playerDelegate.isInitialized()) player.release()
         }
+
+        Function("playAmbient") { uris: List<String>, volume: Double, fadeMs: Int, shuffle: Boolean ->
+            ambient.play(uris, volume.toFloat(), fadeMs.toLong(), shuffle)
+        }
+        Function("stopAmbient") { fadeMs: Int -> ambient.stop(fadeMs.toLong()) }
+        Function("pauseAmbient") { fadeMs: Int -> ambient.pause(fadeMs.toLong()) }
+        Function("resumeAmbient") { fadeMs: Int -> ambient.resume(fadeMs.toLong()) }
+        Function("setAmbientVolume") { volume: Double -> ambient.setVolume(volume.toFloat()) }
     }
 
     companion object {

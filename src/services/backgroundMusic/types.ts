@@ -10,6 +10,14 @@ export interface MusicSource {
   name: string;
 }
 
+export interface EqualizerSettings {
+  enabled: boolean;
+  /** Millibels (1 dB = 100), one per band of the device equalizer. */
+  levels: number[];
+  /** Device preset the levels came from; cleared on manual changes. */
+  preset?: number;
+}
+
 export interface BackgroundMusicSettings {
   enabled: boolean;
   sources: MusicSource[];
@@ -17,8 +25,13 @@ export interface BackgroundMusicSettings {
   volume: number;
   /** 0.5..2 */
   pitch: number;
+  /** 0.5..2 */
+  speed: number;
   repeat: MusicRepeatMode;
   shuffle: boolean;
+  equalizer: EqualizerSettings;
+  /** 0..1000 */
+  bassBoost: number;
 }
 
 export const defaultBackgroundMusicSettings: BackgroundMusicSettings = {
@@ -26,8 +39,11 @@ export const defaultBackgroundMusicSettings: BackgroundMusicSettings = {
   sources: [],
   volume: 0.4,
   pitch: 1,
+  speed: 1,
   repeat: 'all',
   shuffle: false,
+  equalizer: { enabled: false, levels: [] },
+  bassBoost: 0,
 };
 
 export const normalizeBackgroundMusicSettings = (
@@ -36,7 +52,16 @@ export const normalizeBackgroundMusicSettings = (
   ...defaultBackgroundMusicSettings,
   ...stored,
   sources: stored?.sources ?? [],
+  equalizer: {
+    ...defaultBackgroundMusicSettings.equalizer,
+    ...stored?.equalizer,
+    levels: stored?.equalizer?.levels ?? [],
+  },
 });
+
+/** Identifies the equalizer curve, so effects can react to level changes. */
+export const getEqualizerSignature = (equalizer: EqualizerSettings): string =>
+  `${equalizer.enabled}:${equalizer.levels.join(',')}`;
 
 /** Identifies the queue contents, ignoring playback options. */
 export const getSourcesSignature = (sources: MusicSource[]): string =>

@@ -1,6 +1,7 @@
 // Text selection functionality
 window.textRemover = new (function () {
   let selectionUI = null;
+  let characterButtons = [];
   let isUIActive = false;
 
   function createSelectionUI() {
@@ -36,6 +37,25 @@ window.textRemover = new (function () {
         },
         reader.strings.replaceText,
       ),
+      ...['character', 'ambient'].map(layer => {
+        const scriptButton = button(
+          {
+            type: 'button',
+            onclick: e => {
+              if (reader.hidden.val) {
+                e.stopPropagation();
+              }
+              window.ttsCharacters?.openPicker(layer);
+              hideSelectionUI();
+            },
+          },
+          layer === 'ambient'
+            ? reader.strings.scriptAmbient || 'Ambient sound'
+            : reader.strings.scriptCharacter || 'Script character',
+        );
+        characterButtons.push(scriptButton);
+        return scriptButton;
+      }),
     );
 
     document.body.appendChild(selectionUI);
@@ -44,6 +64,12 @@ window.textRemover = new (function () {
 
   function showSelectionUI() {
     const ui = createSelectionUI();
+    // Only offered while TTS is on, since it only affects the voices.
+    characterButtons.forEach(scriptButton => {
+      scriptButton.style.display = reader.generalSettings.val.TTSEnable
+        ? ''
+        : 'none';
+    });
 
     // Get selection bounds
     const selection = window.getSelection();

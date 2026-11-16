@@ -10,6 +10,12 @@ import {
   defaultBackgroundMusicSettings,
   normalizeBackgroundMusicSettings,
 } from '@services/backgroundMusic/types';
+import {
+  MarkVisibility,
+  TtsAmbient,
+  TtsCharacter,
+  defaultMarkVisibility,
+} from '@services/ttsCharacters/types';
 import { useMMKVObject } from 'react-native-mmkv';
 import { useEffect, useMemo } from 'react';
 import { getMMKVObject } from '@utils/mmkv/mmkv';
@@ -229,6 +235,12 @@ export interface ChapterReaderSettings {
     scrollToTop?: boolean;
     /** Music that plays underneath the voice while TTS is reading. */
     backgroundMusic?: BackgroundMusicSettings;
+    /** Voice profiles for scripting passages; the narrator is the main TTS. */
+    characters?: TtsCharacter[];
+    /** Ambient sounds played while the text assigned to them is read. */
+    ambients?: TtsAmbient[];
+    /** Which marks the reader paints over the text. */
+    marksVisibility?: MarkVisibility;
   };
   epubLocation: string;
   epubUseAppTheme: boolean;
@@ -451,6 +463,12 @@ export const useChapterReaderSettings = () => {
         backgroundMusic: normalizeBackgroundMusicSettings(
           storedSettings.tts?.backgroundMusic,
         ),
+        characters: storedSettings.tts?.characters ?? [],
+        ambients: storedSettings.tts?.ambients ?? [],
+        marksVisibility: {
+          ...defaultMarkVisibility,
+          ...storedSettings.tts?.marksVisibility,
+        },
       },
     }),
     [storedSettings],

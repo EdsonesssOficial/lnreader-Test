@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 
 import NativeFile from '@modules/native-file';
-import BackgroundMusic, { MusicTrack } from '@modules/native-background-music';
+import BackgroundMusic, {
+  EqualizerInfo,
+  MusicTrack,
+} from '@modules/native-background-music';
 import { showToast } from '@utils/showToast';
 import {
   BackgroundMusicSettings,
@@ -24,6 +27,7 @@ let loadedSignature: string | undefined;
 let requestId = 0;
 let used = false;
 let subscribed = false;
+let equalizerInfo: EqualizerInfo | null | undefined;
 
 const stripExtension = (name: string) => name.replace(/\.[^./]+$/, '');
 
@@ -47,7 +51,7 @@ const subscribe = () => {
   });
 };
 
-const resolveTracks = async (sources: MusicSource[]) => {
+export const resolveTracks = async (sources: MusicSource[]) => {
   const seen = new Set<string>();
   const resolved: MusicTrack[] = [];
   for (const source of sources) {
@@ -74,6 +78,12 @@ const resolveTracks = async (sources: MusicSource[]) => {
 const applyPlaybackSettings = (settings: BackgroundMusicSettings) => {
   BackgroundMusic.setVolume(settings.volume);
   BackgroundMusic.setPitch(settings.pitch);
+  BackgroundMusic.setSpeed(settings.speed);
+  BackgroundMusic.setEqualizer(
+    settings.equalizer.enabled,
+    settings.equalizer.levels,
+  );
+  BackgroundMusic.setBassBoost(settings.bassBoost);
   BackgroundMusic.setRepeat(settings.repeat);
   BackgroundMusic.setShuffle(settings.shuffle);
 };
@@ -152,6 +162,26 @@ export const backgroundMusicController = {
   applySettings(settings: BackgroundMusicSettings) {
     if (used && settings.enabled) {
       applyPlaybackSettings(settings);
+    }
+  },
+
+  /** Hardware equalizer layout; null when the device does not support it. */
+  getEqualizerInfo(): EqualizerInfo | null {
+    if (equalizerInfo === undefined) {
+      try {
+        equalizerInfo = BackgroundMusic.getEqualizerInfo();
+      } catch {
+        equalizerInfo = null;
+      }
+    }
+    return equalizerInfo;
+  },
+
+  getPresetLevels(index: number): number[] {
+    try {
+      return BackgroundMusic.getPresetLevels(index);
+    } catch {
+      return [];
     }
   },
 

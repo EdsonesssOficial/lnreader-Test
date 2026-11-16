@@ -29,6 +29,8 @@ import ReaderTextAlignSelector from './ReaderTextAlignSelector';
 import ReaderValueChange from './ReaderValueChange';
 import ReaderFontPicker from './ReaderFontPicker';
 import TTSTab from './TTSTab';
+import CharactersTab from './CharactersTab';
+import AmbientTab from './AmbientTab';
 import { BottomSheetModalMethods } from '@gorhom/bottom-sheet/lib/typescript/types';
 import { StringMap } from '@i18n/types';
 
@@ -219,6 +221,8 @@ const routes = [
   { key: 'readerTab', title: getString('readerSettings.title') },
   { key: 'generalTab', title: getString('generalSettings') },
   { key: 'ttsTab', title: 'TTS' },
+  { key: 'charactersTab', title: 'Characters' },
+  { key: 'ambientTab', title: 'Ambient' },
 ];
 
 const renderLazyPlaceholder = () => <View style={styles.flex} />;
@@ -237,6 +241,8 @@ const ReaderBottomSheetV2: React.FC<ReaderBottomSheetV2Props> = ({
         readerTab: ReaderTab,
         generalTab: GeneralTab,
         ttsTab: TTSTab,
+        charactersTab: CharactersTab,
+        ambientTab: AmbientTab,
       }),
     [],
   );
@@ -247,7 +253,12 @@ const ReaderBottomSheetV2: React.FC<ReaderBottomSheetV2Props> = ({
     (props: any) => (
       <TopTabBar
         {...props}
-        indicatorStyle={{ backgroundColor: theme.primary }}
+        scrollEnabled
+        tabStyle={styles.tab}
+        indicatorStyle={[
+          { backgroundColor: theme.primary },
+          styles.tabIndicator,
+        ]}
         style={[
           styles.tabBar,
           {
@@ -301,6 +312,16 @@ const styles = StyleSheet.create({
   tabBar: {
     borderBottomWidth: 0.5,
     elevation: 0,
+  },
+  // Five tabs do not fit side by side, so the bar scrolls and each tab has a
+  // fixed width; the indicator is centered under its 100px tab.
+  tab: {
+    width: 100,
+  },
+  tabIndicator: {
+    width: 60,
+    marginHorizontal: 0,
+    marginLeft: 20,
   },
   tabView: {
     height: 600,
