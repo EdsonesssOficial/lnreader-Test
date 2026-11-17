@@ -50,8 +50,8 @@ window.textRemover = new (function () {
             },
           },
           layer === 'ambient'
-            ? reader.strings.scriptAmbient || 'Ambient sound'
-            : reader.strings.scriptCharacter || 'Script character',
+            ? reader.strings.ambientButton || 'Ambient'
+            : reader.strings.characterButton || 'Character',
         );
         characterButtons.push(scriptButton);
         return scriptButton;
@@ -99,13 +99,11 @@ window.textRemover = new (function () {
           ),
           10,
         ) || 16;
-      const uiHeight = 50; // Approximate height of our UI
 
       // Calculate available space
       const viewportHeight = window.innerHeight;
       const selectionCenterY = rect.top + rect.height / 2;
       const topSafeArea = statusBarHeight + readerPadding + 10;
-      const bottomSafeArea = readerPadding + uiHeight + navigationBarHeight;
 
       // Position UI based on selection location
       let topPosition;
@@ -116,9 +114,11 @@ window.textRemover = new (function () {
           ? 0
           : 42;
         const avoidUI = !reader.hidden.val ? 46 + avoidScrollbar : 0;
-        topPosition = viewportHeight - bottomSafeArea - avoidUI - 4;
-        ui.style.top = topPosition + 'px';
-        ui.style.bottom = 'auto';
+        // Anchored by its bottom edge, so a wrapped row grows upward instead of
+        // sliding under the reader footer.
+        ui.style.top = 'auto';
+        ui.style.bottom =
+          readerPadding + navigationBarHeight + avoidUI + 4 + 'px';
       } else {
         // Selection is in bottom 1/5, position UI at top (accounting for status bar)
         topPosition = Math.max(topSafeArea, statusBarHeight + 20);

@@ -71,6 +71,12 @@ const onLogMessage = (payload: { nativeEvent: { data: string } }) => {
 };
 
 /** Checks whether two TTS settings objects are equal */
+// Extra entries of the system text-selection toolbar (next to Copy/Share).
+const ttsMenuItems = [
+  { label: 'Script character', key: 'tts-character' },
+  { label: 'Ambient sound', key: 'tts-ambient' },
+];
+
 const areTTSSettingsEqual = (
   a: ChapterReaderSettings['tts'],
   b: ChapterReaderSettings['tts'],
@@ -431,6 +437,8 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
                     replaceText: getString('customCodeSettings.replace'),
                     scriptCharacter: 'Script character',
                     scriptAmbient: 'Ambient sound',
+                    characterButton: 'Character',
+                    ambientButton: 'Ambient',
                     narratorLabel: 'Narrator',
                     noAmbientLabel: 'No ambient sound',
                     noCharacters:
@@ -483,6 +491,16 @@ const WebViewReader: React.FC<WebViewReaderProps> = ({
     <>
       <WebView
         ref={webViewRef}
+        menuItems={
+          chapterGeneralSettings.TTSEnable ? ttsMenuItems : undefined
+        }
+        onCustomMenuSelection={event => {
+          const layer =
+            event.nativeEvent.key === 'tts-ambient' ? 'ambient' : 'character';
+          webViewRef.current?.injectJavaScript(
+            `window.ttsCharacters?.openPicker('${layer}'); true;`,
+          );
+        }}
         onTouchStart={onTouchStart}
         style={{ backgroundColor: readerSettings.theme }}
         allowFileAccess={true}

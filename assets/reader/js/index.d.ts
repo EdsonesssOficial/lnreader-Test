@@ -33,6 +33,8 @@ export interface Reader {
     replaceText: string;
     scriptCharacter: string;
     scriptAmbient: string;
+    characterButton: string;
+    ambientButton: string;
     narratorLabel: string;
     noAmbientLabel: string;
     noCharacters: string;

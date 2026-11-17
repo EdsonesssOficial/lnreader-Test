@@ -10,6 +10,11 @@ window.ttsCharacters = new (function () {
   let pending = null;
   let pickerElement = null;
   let confirmClear = false;
+  // The system toolbar clears the selection when one of its items is tapped,
+  // so the last selection is remembered for a moment.
+  let lastParts = [];
+  let lastPartsAt = 0;
+  let cacheTimer = null;
 
   const ttsSettings = () => reader.readerSettings.val.tts || {};
   const roster = layer =>
@@ -273,6 +278,19 @@ window.ttsCharacters = new (function () {
     return parts;
   };
 
+  const SELECTION_MEMORY_MS = 15000;
+
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(cacheTimer);
+    cacheTimer = setTimeout(() => {
+      const parts = captureSelection();
+      if (parts.length > 0) {
+        lastParts = parts;
+        lastPartsAt = Date.now();
+      }
+    }, 150);
+  });
+
   // --- Picker ------------------------------------------------------------
 
   const closePicker = () => {
@@ -367,7 +385,10 @@ window.ttsCharacters = new (function () {
   };
 
   this.openPicker = layer => {
-    const parts = captureSelection();
+    let parts = captureSelection();
+    if (parts.length === 0 && Date.now() - lastPartsAt < SELECTION_MEMORY_MS) {
+      parts = lastParts;
+    }
     if (parts.length === 0) return;
     pending = parts;
     confirmClear = false;
