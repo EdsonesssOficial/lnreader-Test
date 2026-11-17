@@ -20,6 +20,8 @@ html {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  /* Without this, left: 50% leaves only half the screen and the buttons wrap. */
+  width: max-content;
   max-width: calc(100vw - 24px);
   overflow: hidden;
   border: 1px solid var(--theme-outlineVariant);

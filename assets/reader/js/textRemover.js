@@ -116,9 +116,10 @@ window.textRemover = new (function () {
         const avoidUI = !reader.hidden.val ? 46 + avoidScrollbar : 0;
         // Anchored by its bottom edge, so a wrapped row grows upward instead of
         // sliding under the reader footer.
+        const lift = !reader.hidden.val ? 56 : 24;
         ui.style.top = 'auto';
         ui.style.bottom =
-          readerPadding + navigationBarHeight + avoidUI + 4 + 'px';
+          readerPadding + navigationBarHeight + avoidUI + lift + 'px';
       } else {
         // Selection is in bottom 1/5, position UI at top (accounting for status bar)
         topPosition = Math.max(topSafeArea, statusBarHeight + 20);
